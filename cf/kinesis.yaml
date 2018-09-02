@@ -1,0 +1,11 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  MyStream:
+    Type: 'AWS::Kinesis::Stream'
+    Properties:
+      Name: MyKinesisStream
+      RetentionPeriodHours: 25
+      ShardCount: 1
+      Tags:
+        - Key: Environment
+          Value: Production
