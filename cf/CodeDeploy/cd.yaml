@@ -1,0 +1,29 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.us-west-2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:                # optional, list of String
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+      RoleName: CodeDeployServiceRole     # optional
+
+Outputs:
+  CodeDeployServiceRoleArn:      #
+    Description: Code deploy service role arn  # optional, string describing the output
+    Value:
+      Fn::GetAtt: CodeDeployServiceRole.Arn   # required, value of the output
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-CodeDeployServiceRoleArn"    # optional, name used for cross-stack reference

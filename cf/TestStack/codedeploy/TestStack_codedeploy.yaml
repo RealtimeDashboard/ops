@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  ApplicationName: {Default: Test, Description: Application Name, Type: String}
+  ApplicationStackName: {AllowedPattern: '^[a-zA-Z][-a-zA-Z0-9]*$', Default: TestStack,
+    Description: Name of the application infrastructure stack, MaxLength: 255, MinLength: 1,
+    Type: String}
+  CodedeployBucketName: {Default: test-codedeploybucket, Description: Code deploy
+      bucket name, Type: String}
+Resources:
+  CodeDeployApplication:
+    Properties:
+      ApplicationName: {Ref: ApplicationName}
+    Type: AWS::CodeDeploy::Application
+  CodeDeployDeploymentGroup:
+    Properties:
+      ApplicationName: {Ref: CodeDeployApplication}
+      AutoScalingGroups:
+        - TestStack-BlueGreenAutoScalingGroup-1PB153T5VM185
+      Deployment:
+        Description: A sample deployment
+        IgnoreApplicationStopFailures: true
+        Revision:
+          RevisionType: S3
+          S3Location:
+            Bucket: {Ref: CodedeployBucketName}
+            BundleType: tar
+            Key: {Ref: ApplicationName}
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      DeploymentGroupName: {'Fn::Sub': '${ApplicationName}-DeploymentGroup'}
+      DeploymentStyle: {DeploymentOption: WITH_TRAFFIC_CONTROL, DeploymentType: BLUE_GREEN}
+      LoadBalancerInfo:
+        ElbInfoList:
+        - Name:
+            Fn::ImportValue: {'Fn::Sub': '${ApplicationStackName}-LoadBalancerId'}
+      ServiceRoleArn: {'Fn::GetAtt': CodeDeployServiceRole.Arn}
+    Type: AWS::CodeDeploy::DeploymentGroup
+  CodeDeployServiceRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codedeploy.us-west-2.amazonaws.com]
+        Version: 2012-10-17
+      ManagedPolicyArns: ['arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole']
+      RoleName: CodeDeployServiceRole
+    Type: AWS::IAM::Role

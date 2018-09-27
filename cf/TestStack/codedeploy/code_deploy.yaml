@@ -1,0 +1,76 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  CodedeployBucketName:
+    Type: String
+    Description: Code deploy bucket name    # optional, string, description of parameter value
+    Default: "test-codedeploybucket"
+  ApplicationName:
+    Type: String
+    Description: Application Name
+    Default: Test
+  ApplicationStackName:
+    Type: String
+    Description: Name of the application infrastructure stack    # optional, string, description of parameter value
+    Default: "TestStack"
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"    # optional, regular expression enforced on string values
+    MaxLength: 255      # optional, max length for string values
+    MinLength: 1      # optional, smallest number of characters allowed for string parameter types
+
+Resources:
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - codedeploy.us-west-2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:                # optional, list of String
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+      RoleName: CodeDeployServiceRole     # optional
+
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName:
+        Ref: ApplicationName     # optional
+
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      Deployment:
+        Description: "A sample deployment"
+        IgnoreApplicationStopFailures: true
+        Revision:
+          RevisionType: S3
+          S3Location:
+            Bucket:
+              Ref: CodedeployBucketName
+            Key:
+              Ref: ApplicationName
+            BundleType: tar
+            # Version:
+            #   Ref: Version
+      ApplicationName:
+        Ref: CodeDeployApplication     # required
+      LoadBalancerInfo:
+        ElbInfoList:
+          - Name:
+              Fn::ImportValue: {'Fn::Sub': '${ApplicationStackName}-LoadBalancerId'}
+      AutoScalingGroups:                # optional, list of String
+        - Fn::ImportValue: {'Fn::Sub': '${ApplicationStackName}-BlueGreenAutoScalingGroupId'}
+      DeploymentConfigName: CodeDeployDefault.OneAtATime     # optional
+      DeploymentGroupName:
+        Fn::Sub: "${ApplicationName}-DeploymentGroup"    # optional
+      ServiceRoleArn:
+        Fn::GetAtt: CodeDeployServiceRole.Arn
+      DeploymentStyle:
+        DeploymentType: BLUE_GREEN
+        DeploymentOption: WITH_TRAFFIC_CONTROL

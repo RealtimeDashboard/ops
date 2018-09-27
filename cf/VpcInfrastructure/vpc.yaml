@@ -1,0 +1,88 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: "10.0.0.0/16"     # required
+      EnableDnsHostnames: true     # optional
+      EnableDnsSupport: true     # optional
+      InstanceTenancy: "default"     # optional
+      Tags:
+        - Key: Name
+          Value:
+            Ref: "AWS::StackName"
+  IGT:
+    Properties:
+      Tags:
+        - Key: Name
+          Value:
+            Ref: "AWS::StackName"
+    Type: AWS::EC2::InternetGateway
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: IGT     # optional
+      VpcId:
+        Ref: VPC     # required
+  PublicRoutingTable:
+    Properties:
+      VpcId:
+        Ref: VPC     # required
+      Tags:
+        - Key: Name
+          Value:
+            Ref: "AWS::StackName"
+    Type: AWS::EC2::RouteTable
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"     # optional
+      GatewayId:
+        Ref: IGT     # optional
+      RouteTableId:
+        Ref: PublicRoutingTable     # required
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+        - Key: Name
+          Value:
+            Ref: "AWS::StackName"
+      CidrBlock: "10.0.0.0/24"     # required
+      VpcId:
+        Ref: VPC
+  PublicRoutingTableSubnetAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRoutingTable
+      SubnetId:
+        Ref: PublicSubnet     # required
+
+
+Outputs:
+  VpcId:
+    Description: "VPC ID"  # optional, string describing the output
+    Value:
+      Ref: VPC    # required, value of the output
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-VPCID"    # optional, name used for cross-stack reference
+  PublicRoutingTableId:      #
+    Description: "Public Routing Table Id"  # optional, string describing the output
+    Value:
+      Ref: PublicRoutingTable    # required, value of the output
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-PublicRoutingTableId"    # optional, name used for cross-stack reference
+  PublicSubnetId:      #
+    Description: Public Subnet Id  # optional, string describing the output
+    Value:
+      Ref: PublicSubnet    # required, value of the output
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-PublicSubnetId"    # optional, name used for cross-stack reference

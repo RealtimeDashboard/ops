@@ -1,0 +1,191 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Mappings:
+  RegionOS2AMI:
+    us-east-1: {Linux: ami-b73b63a0}
+    us-west-2: {Linux: ami-6cd6f714}
+Outputs:
+  ApplicationDNS:
+    Description: DNS of the application
+    Value: {'Fn::GetAtt': ClassicLoadBalancer.DNSName}
+  BlueGreenAutoScalingGroupId:
+    Description: Auto scaling group id
+    Export:
+      Name: {'Fn::Sub': '${AWS::StackName}-BlueGreenAutoScalingGroupId'}
+    Value: {Ref: BlueGreenAutoScalingGroup}
+  CodeDeployBucketName:
+    Description: Code deploy bucket name
+    Export:
+      Name: {'Fn::Sub': '${AWS::StackName}-CodeDeployBucketName'}
+    Value: {Ref: TestCodeDeployBucket}
+  LoadBalancerId:
+    Description: Id of the load balancer
+    Export:
+      Name: {'Fn::Sub': '${AWS::StackName}-LoadBalancerId'}
+    Value: {Ref: ClassicLoadBalancer}
+Parameters:
+  CodedeployBucketName: {Default: test-codedeploybucket, Description: Code deploy
+      bucket name, Type: String}
+  DesiredCount: {Default: 1, Description: Desired number of Amazon EC2 instances in
+      an autoscaling group., MaxValue: 3, MinValue: 1, Type: Number}
+  KeyPairName: {Default: codedeploytest, Description: Key Pair Name, Type: String}
+  MaxCount: {Default: 1, Description: Max number of Amazon EC2 instances in an autoscaling
+      group., MaxValue: 3, MinValue: 1, Type: Number}
+  MinCount: {Default: 1, Description: Min number of Amazon EC2 instances in an autoscaling
+      group., MaxValue: 3, MinValue: 1, Type: Number}
+  NetworkStackName: {AllowedPattern: '^[a-zA-Z][-a-zA-Z0-9]*$', Default: VpcInfrastructure,
+    Description: Name of the vpc infrastructure stack, MaxLength: 255, MinLength: 1,
+    Type: String}
+Resources:
+  BlueGreenAutoScalingGroup:
+    Properties:
+      DesiredCapacity: {Ref: DesiredCount}
+      LaunchConfigurationName: {Ref: BlueGreenLaunchConfiguration}
+      LoadBalancerNames:
+      - {Ref: ClassicLoadBalancer}
+      MaxSize: {Ref: MaxCount}
+      MinSize: {Ref: MinCount}
+      VPCZoneIdentifier:
+      - Fn::ImportValue: {'Fn::Sub': '${NetworkStackName}-PublicSubnetId'}
+    Type: AWS::AutoScaling::AutoScalingGroup
+  BlueGreenLaunchConfiguration:
+    Properties:
+      IamInstanceProfile: {Ref: InstanceRoleInstanceProfile}
+      ImageId:
+        Fn::FindInMap:
+        - RegionOS2AMI
+        - {Ref: 'AWS::Region'}
+        - Linux
+      InstanceType: t2.micro
+      KeyName: {Ref: KeyPairName}
+      SecurityGroups:
+      - {Ref: SecurityGroup}
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - '#!/bin/bash -ex
+
+              '
+            - 'yum install -y aws-cfn-bootstrap
+
+              '
+            - 'yum install -y httpd
+
+              '
+            - "echo hello lb| sudo tee --append /var/www/html/index.html \n"
+            - 'service httpd start
+
+              '
+            - 'yum install -y ruby
+
+              '
+            - 'yum install -y aws-cli
+
+              '
+            - '# Helper function.
+
+              '
+            - 'function error_exit
+
+              '
+            - '{
+
+              '
+            - '  /opt/aws/bin/cfn-signal -e 1 -r "$1" '
+            - Fn::Base64: {Ref: WaitHandle}
+            - '
+
+              '
+            - '  exit 1
+
+              '
+            - '}
+
+              '
+            - '# Install the AWS CodeDeploy Agent.
+
+              '
+            - 'cd /home/ec2-user/
+
+              '
+            - 'aws configure set default.s3.signature_version s3v4 || error_exit ''Failed
+              to set aws cli signature to version 4''
+
+              '
+            - 'aws s3 cp ''s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm''
+              . --region us-west-2 || error_exit ''Failed to download AWS CodeDeploy
+              Agent.''
+
+              '
+            - "yum -y install codedeploy-agent.noarch.rpm || error_exit 'Failed to\
+              \ install AWS CodeDeploy Agent.' \n"
+            - '# All is well, so signal success.
+
+              '
+            - '/opt/aws/bin/cfn-signal -e 0 -r "AWS CodeDeploy Agent setup complete." '
+            - Fn::Base64: {Ref: WaitHandle}
+            - '
+
+              '
+    Type: AWS::AutoScaling::LaunchConfiguration
+  ClassicLoadBalancer:
+    Properties:
+      HealthCheck: {HealthyThreshold: 2, Interval: 10, Target: 'HTTP:80/', Timeout: 5,
+        UnhealthyThreshold: 5}
+      Listeners:
+      - {InstancePort: 80, LoadBalancerPort: 80, Protocol: HTTP}
+      LoadBalancerName: ClassicLoadBalancer
+      SecurityGroups:
+      - {Ref: SecurityGroup}
+      Subnets:
+      - Fn::ImportValue: {'Fn::Sub': '${NetworkStackName}-PublicSubnetId'}
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+  InstanceRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+        Version: 2012-10-17
+    Type: AWS::IAM::Role
+  InstanceRoleInstanceProfile:
+    Properties:
+      Roles:
+      - {Ref: InstanceRole}
+    Type: AWS::IAM::InstanceProfile
+  InstanceRolePolicy:
+    Properties:
+      PolicyDocument:
+        Statement:
+        - Action: ['s3:Get*', 's3:List*', 'autoscaling:Describe*', 'cloudformation:Describe*',
+            'cloudformation:GetTemplate']
+          Effect: Allow
+          Resource: '*'
+      PolicyName: InstanceRole
+      Roles:
+      - {Ref: InstanceRole}
+    Type: AWS::IAM::Policy
+  SecurityGroup:
+    Properties:
+      GroupDescription: Enable HTTP access via port 80 and SSH access.
+      SecurityGroupIngress:
+      - {CidrIp: 0.0.0.0/0, FromPort: 80, IpProtocol: tcp, ToPort: 80}
+      - {CidrIp: 0.0.0.0/0, FromPort: 22, IpProtocol: tcp, ToPort: 22}
+      VpcId:
+        Fn::ImportValue: {'Fn::Sub': '${NetworkStackName}-VPCID'}
+    Type: AWS::EC2::SecurityGroup
+  TestCodeDeployBucket:
+    Properties:
+      AccessControl: Private
+      BucketName: {Ref: CodedeployBucketName}
+      VersioningConfiguration: {Status: Enabled}
+    Type: AWS::S3::Bucket
+  WaitCondition:
+    Properties:
+      Count: {Ref: DesiredCount}
+      Handle: {Ref: WaitHandle}
+      Timeout: 1800
+    Type: AWS::CloudFormation::WaitCondition
+  WaitHandle: {Type: 'AWS::CloudFormation::WaitConditionHandle'}

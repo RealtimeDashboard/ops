@@ -1,0 +1,35 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Resources:
+  ClassicLoadBalancer:
+    Type: "AWS::ElasticLoadBalancing::LoadBalancer"
+    Properties:
+      LoadBalancerName: ClassicLoadBalancer
+      Subnets:
+        - Fn::ImportValue: {'Fn::Sub': '${NetworkStackName}-PublicSubnetId'}
+      Listeners:
+        -
+          LoadBalancerPort: 80
+          InstancePort: 80
+          Protocol: HTTP
+      HealthCheck:
+        Target: "HTTP:80/"
+        HealthyThreshold: 2
+        UnhealthyThreshold: 5
+        Interval: 10
+        Timeout: 5
+      SecurityGroups:
+        - Ref: SecurityGroup
+Outputs:
+  LoadBalancerId:      #
+    Description: Id of the load balancer  # optional, string describing the output
+    Value:
+      Ref: ClassicLoadBalancer   # required, value of the output
+    Export:
+      Name:
+        Fn::Sub: "${AWS::StackName}-LoadBalancerId"
+  ApplicationDNS:      #
+    Description: DNS of the application  # optional, string describing the output
+    Value:
+      Fn::GetAtt: ClassicLoadBalancer.DNSName    # required, value of the output

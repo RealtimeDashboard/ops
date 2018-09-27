@@ -1,0 +1,8 @@
+#!/bin/bash
+set -Eeuo pipefail
+if [ $# -eq 0 ]
+  then
+    echo "Please provide a stack name"
+    exit
+fi
+python mergecf.py $1 $2

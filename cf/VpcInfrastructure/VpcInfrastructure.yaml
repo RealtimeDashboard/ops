@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Outputs:
+  PublicRoutingTableId:
+    Description: Public Routing Table Id
+    Export:
+      Name: {'Fn::Sub': '${AWS::StackName}-PublicRoutingTableId'}
+    Value: {Ref: PublicRoutingTable}
+  PublicSubnetId:
+    Description: Public Subnet Id
+    Export:
+      Name: {'Fn::Sub': '${AWS::StackName}-PublicSubnetId'}
+    Value: {Ref: PublicSubnet}
+  VpcId:
+    Description: VPC ID
+    Export:
+      Name: {'Fn::Sub': '${AWS::StackName}-VPCID'}
+    Value: {Ref: VPC}
+Resources:
+  IGT:
+    Properties:
+      Tags:
+      - Key: Name
+        Value: {Ref: 'AWS::StackName'}
+    Type: AWS::EC2::InternetGateway
+  PublicRoute:
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: {Ref: IGT}
+      RouteTableId: {Ref: PublicRoutingTable}
+    Type: AWS::EC2::Route
+  PublicRoutingTable:
+    Properties:
+      Tags:
+      - Key: Name
+        Value: {Ref: 'AWS::StackName'}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::RouteTable
+  PublicRoutingTableSubnetAssociation:
+    Properties:
+      RouteTableId: {Ref: PublicRoutingTable}
+      SubnetId: {Ref: PublicSubnet}
+    Type: AWS::EC2::SubnetRouteTableAssociation
+  PublicSubnet:
+    Properties:
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: 'true'
+      Tags:
+      - Key: Name
+        Value: {Ref: 'AWS::StackName'}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::Subnet
+  VPC:
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: {Ref: 'AWS::StackName'}
+    Type: AWS::EC2::VPC
+  VpcGatewayAttachment:
+    Properties:
+      InternetGatewayId: {Ref: IGT}
+      VpcId: {Ref: VPC}
+    Type: AWS::EC2::VPCGatewayAttachment
