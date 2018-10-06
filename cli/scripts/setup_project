@@ -1,0 +1,78 @@
+#!/usr/bin/env ruby
+require 'optparse'
+require 'fileutils'
+require 'ostruct'
+require 'logger'
+require_relative '../lib/repo.rb'
+require_relative '../lib/log.rb'
+require_relative '../lib/cmn.rb'
+
+def init_logger
+  l = Logger.new(STDOUT)
+  l.level = Logger::INFO
+  Log.logger = l
+end
+
+def project(opts)
+  return Log.logger.error( "Please provide a name for the project. Run with -h flag") unless opts.has_key? :projectName
+  Log.logger.info( "Adding Project #{opts[:projectName]}")
+  GitRepo.init_local("","#{opts[:projectName]}VpcInfra", RepoType::VPC_INFRA)
+end
+
+def service(opts)
+  return Log.logger.error( "Please provide a name for the service. Run with -h flag") unless opts.has_key? :serviceName
+  Log.logger.info( "Adding Service #{opts[:serviceName]}")
+  GitRepo.init_local("","#{opts[:serviceName]}Infra", RepoType::STACK_INFRA)
+  GitRepo.init_local("","#{opts[:serviceName]}", RepoType::CODE)
+end
+
+def help(opts)
+  puts "This command will setup the project on AWS"
+  puts "Usage: "
+  puts "setup_project setup-vpc -n <PROJECT_NAME>"
+  puts "setup_project add-ec2-service -n <PROJECT_NAME>"
+end
+
+options = {}
+subcommands = {
+  "setup-vpc" => {
+    :opts => OptionParser.new do |opts|
+      opts.banner = "This command will setup VPC Infrastructure: GithubRepo, CodePipeline"
+      opts.on('-n', '--projectName string', "Name of the Project") do |projectName|
+        options[:projectName] = projectName
+      end
+      opts.on_tail('-h', '--help', 'Show this message') do
+        puts opts
+        exit
+      end
+    end,
+    :call => method(:project)
+  },
+  "add-ec2-service" => {
+    :opts => OptionParser.new do |opts|
+      opts.banner = "This command will setup GithubRepo, CodePipeline for StackCode and StackInfra"
+      opts.on('-n', '--serviceName string', "Name of the Service") do |serviceName|
+        options[:serviceName] = serviceName
+      end
+      opts.on_tail('-h', '--help', 'Show this message') do
+        puts opts
+        exit
+      end
+    end,
+    :call => method(:service)
+  },
+  "help" => {
+    :opts => OptionParser.new do |opts|
+    end,
+    :call => method(:help)
+  }
+}
+
+init_logger
+subcommand = subcommands[ARGV.shift]
+if subcommand
+  subcommand[:opts].order!
+  subcommand[:call].call(options)
+else
+  Log.logger.error( "Invalid command. Run setup_project help")
+end

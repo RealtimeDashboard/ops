@@ -1,0 +1,23 @@
+{
+    "name": "codebuild-demo-project-2",
+    "source": {
+        "type": "GITHUB",
+        "location": "https://github.com/tkashish/MessageUtil",
+        "buildspec": "",
+        "auth": {
+            "type": "OAUTH",
+            "resource": ""
+        }
+    },
+    "artifacts": {
+        "type": "S3",
+        "location": "codebuild-uw2-049505233733-output-bucket",
+    },
+    "environment": {
+      "type": "LINUX_CONTAINER",
+      "image": "aws/codebuild/java:openjdk-8",
+      "computeType": "BUILD_GENERAL1_SMALL"
+    },
+    "serviceRole": "",
+    "badgeEnabled": true
+}

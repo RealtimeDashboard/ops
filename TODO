@@ -1,0 +1,61 @@
+1) VPC
+  - Can be deployed using aws cli
+  - VPC, PublicSubntes, RouteTables etc
+2) Application Stack
+  a) Infrastructure
+    - Can be setup using aws cli
+    - LB, ASG, CodeDeploy stack
+  b) Code
+    - CD: AWS CodePipeline
+    - CI: AWS CodeBuild or Jenkins OR use both (JENKINS master and CodeBuild workers)
+      Should be able to CI and CD using simple commands or AWS CloudFormation
+      Check how setup notifications/emails
+    - Deployment: AWS CodeDeploy
+===========================================================================================
+PROJECT SETUP
+===========================================================================================
+CLI: [RUBY]
+1) [DONE] setup-vpc [cli setup-vpc -n <PROJECT_NAME>]
+   Name of the Github project = <PROJECT_NAME>VpcInfra
+   This command will setup VPC using CloudFormation (<PROJECT_NAME>_VPC_INFRASTRUCTURE)
+2) [DONE] add-service [cli add-service -n <SERVICE_NAME>]
+   This command will setup 2 Github repos:
+   - <SERVICE_NAME>StackInfra
+   - <SERVICE_NAME>
+NOTE:
+  The CF will be deployed using CodePipeline
+  - Stages:
+    1) Source
+    2) Validate CF Template
+    3) [Require Approval] Update or Create the Infrastructure
+
+LINKS:
+  - https://aws.amazon.com/answers/devops/aws-cloudformation-validation-pipeline/
+  - https://s3.amazonaws.com/solutions-reference/aws-cloudformation-validation-pipeline/latest/aws-cloudformation-validation-pipeline.pdf
+===========================================================================================
+2.b) CODE
+===========================================================================================
+CLI: [RUBY]
+1)[DONE] create-project  [cli create-project -n <PROJECT_NAME> -r <REPO_NAME> -t <REPO_TYPE>]
+    Create uncommitted Github repository with a template
+    - The template should have a
+      - buildspec.yml file for AWS CodeBuild
+      - appspec.yml file for AWS CodeDeploy
+      - src dir for SourceCode
+2) promote [cli promote -n <PROJECT_NAME> -r <REPO_NAME>]
+    The Application stack (2.a) would have already created the resources required by CodeDeploy.
+    This step will:
+    - [DONE] Push the code to Github.
+    - Create a Pipeline.
+      - This pipeline will have the ability to pull from <REPO_NAME>
+      - Build the code
+      - deploy it to the CodeDeploy Group created earlier
+      - Notify the user with emails at every stage
+
+To create a pipeline:
+1) Create a AWS CodePipeline-CodeBuild Service Role
+   aws iam create-role --role-name AWS-CodePipeline-CodeBuild-Service-Role --assume-role-policy-document '{"Version":"2012-10-17","Statement":{"Effect":"Allow","Principal":{"Service":"codepipeline.amazonaws.com"},"Action":"sts:AssumeRole"}}'
+2)
+
+To create a build for project on AWS CodeBuild:
+1) aws codebuild create-project --cli-input-json file://create-project.json

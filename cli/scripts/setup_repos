@@ -1,0 +1,97 @@
+#!/usr/bin/env ruby
+require 'optparse'
+require 'fileutils'
+require 'ostruct'
+require 'logger'
+require '../lib/repo.rb'
+require '../lib/log.rb'
+require '../lib/cmn.rb'
+
+def init_logger
+  l = Logger.new(STDOUT)
+  l.level = Logger::INFO
+  Log.logger = l
+end
+
+VPC_INFRA = "VPC_INFRA"
+STACK_INFRA = "STACK_INFRA"
+CODE = "CODE"
+
+def code_committed()
+  commits = `git log | grep  ''  -c`
+  commits.chomp.to_i > 1
+end
+
+def create_local_repo_from_template(opts)
+  return Log.logger.error( "Please provide a repo name. Run with -h flag") unless opts.has_key? :repoName
+  projectName = (opts.has_key? :projectName) ? opts[:projectName] : ''
+  return Log.logger.error( "Repository #{opts[:repoName]} already exists") if GitRepo.exists(projectName, opts[:repoName])
+  GitRepo.init_local(projectName, opts[:repoName], opts[:repoType])
+end
+
+def puslish(opts)
+  return Log.logger.error( "Please provide a repo name. Run with -h flag") unless opts.has_key? :repoName
+  return Log.logger.error( "Please commit your code first") unless code_committed
+  GitRepo.puslish(opts[:repoName])
+end
+
+def help(opts)
+  puts "This command will setup preconfigured repos on Github"
+  puts "Usage: "
+  puts "setup_repos create -n <PROJECT_NAME> -r <REPO_NAME> -t <Type of repo: '#{VPC_INFRA}' OR '#{STACK_INFRA}' OR '#{CODE}'>"
+  puts "setup_repos promote -n <PROJECT_NAME> -r <REPO_NAME>"
+end
+
+options = {}
+subcommands = {
+  "create" => {
+    :opts => OptionParser.new do |opts|
+      options[:repoType] = "CODE"
+      opts.banner = "Create a new project"
+      opts.on('-n', '--projectName string', "Name of the Project") do |projectName|
+        options[:projectName] = projectName
+      end
+      opts.on('-r', '--repoName string', "Name of the Repository") do |repoName|
+        options[:repoName] = repoName
+      end
+      opts.on('-t', '--repoType string', "Type of repo: '#{VPC_INFRA}' OR '#{STACK_INFRA}' OR '#{CODE}'") do |repoType|
+        options[:repoType] = repoType
+      end
+      opts.on_tail('-h', '--help', 'Show this message') do
+        puts opts
+        exit
+      end
+    end,
+    :call => method(:create_local_repo_from_template)
+  },
+  "promote" => {
+    :opts => OptionParser.new do |opts|
+      opts.banner = "Publish the project to github"
+      opts.on('-n', '--projectName string', "Name of the Project") do |projectName|
+        options[:projectName] = projectName
+      end
+      opts.on('-r', '--repoName string', "Name of the Repository") do |repoName|
+        options[:repoName] = repoName
+      end
+      opts.on_tail('-h', '--help', 'Show this message') do
+        puts opts
+        exit
+      end
+    end,
+    :call => method(:puslish)
+  },
+  "help" => {
+    :opts => OptionParser.new do |opts|
+    end,
+    :call => method(:help)
+  }
+}
+
+init_logger
+subcommand = subcommands[ARGV.shift]
+if subcommand
+  subcommand[:opts].order!
+  subcommand[:call].call(options)
+else
+  Log.logger.error( "invalid command")
+end

@@ -1,0 +1,4 @@
+#!/bin/bash
+set -xe
+curr_dir=`pwd`
+export PATH=$PATH:$curr_dir/scripts

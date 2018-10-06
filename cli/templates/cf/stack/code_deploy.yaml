@@ -14,13 +14,6 @@ Parameters:
     Type: String
     Description: Application Bundle Type
     Default: zip
-  ApplicationStackName:
-    Type: String
-    Description: Name of the application infrastructure stack    # optional, string, description of parameter value
-    Default: "TestStackInfra"
-    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"    # optional, regular expression enforced on string values
-    MaxLength: 255      # optional, max length for string values
-    MinLength: 1      # optional, smallest number of characters allowed for string parameter types
 
 Resources:
   CodeDeployServiceRole:
@@ -49,6 +42,8 @@ Resources:
   CodeDeployDeploymentGroup:
     DependsOn:
       - CodeDeployServiceRole
+      - BlueGreenAutoScalingGroup
+      - ClassicLoadBalancer
     Type: AWS::CodeDeploy::DeploymentGroup
     Properties:
       Deployment:
@@ -68,9 +63,9 @@ Resources:
       LoadBalancerInfo:
         ElbInfoList:
           - Name:
-              Fn::ImportValue: {'Fn::Sub': '${ApplicationStackName}-LoadBalancerId'}
+              Ref: ClassicLoadBalancer
       AutoScalingGroups:                # optional, list of String
-        - Fn::ImportValue: {'Fn::Sub': '${ApplicationStackName}-BlueGreenAutoScalingGroupId'}
+        - Ref: BlueGreenAutoScalingGroup
       DeploymentConfigName: CodeDeployDefault.OneAtATime     # optional
       DeploymentGroupName:
         Fn::Sub: "${ApplicationName}-DeploymentGroup"    # optional

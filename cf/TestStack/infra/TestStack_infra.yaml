@@ -23,12 +23,14 @@ Outputs:
       Name: {'Fn::Sub': '${AWS::StackName}-LoadBalancerId'}
     Value: {Ref: ClassicLoadBalancer}
 Parameters:
+  ApplicationName: {Default: Test, Description: Application Name, Type: String}
+  BundleType: {Default: zip, Description: Application Bundle Type, Type: String}
   CodedeployBucketName: {Default: test-codedeploybucket, Description: Code deploy
       bucket name, Type: String}
-  DesiredCount: {Default: 1, Description: Desired number of Amazon EC2 instances in
+  DesiredCount: {Default: 3, Description: Desired number of Amazon EC2 instances in
       an autoscaling group., MaxValue: 3, MinValue: 1, Type: Number}
   KeyPairName: {Default: codedeploytest, Description: Key Pair Name, Type: String}
-  MaxCount: {Default: 1, Description: Max number of Amazon EC2 instances in an autoscaling
+  MaxCount: {Default: 3, Description: Max number of Amazon EC2 instances in an autoscaling
       group., MaxValue: 3, MinValue: 1, Type: Number}
   MinCount: {Default: 1, Description: Min number of Amazon EC2 instances in an autoscaling
       group., MaxValue: 3, MinValue: 1, Type: Number}
@@ -140,6 +142,45 @@ Resources:
       Subnets:
       - Fn::ImportValue: {'Fn::Sub': '${NetworkStackName}-PublicSubnetId'}
     Type: AWS::ElasticLoadBalancing::LoadBalancer
+  CodeDeployApplication:
+    Properties:
+      ApplicationName: {Ref: ApplicationName}
+    Type: AWS::CodeDeploy::Application
+  CodeDeployDeploymentGroup:
+    DependsOn: [CodeDeployServiceRole, BlueGreenAutoScalingGroup, ClassicLoadBalancer]
+    Properties:
+      ApplicationName: {Ref: CodeDeployApplication}
+      AutoScalingGroups:
+      - {Ref: BlueGreenAutoScalingGroup}
+      Deployment:
+        Description: A sample deployment
+        IgnoreApplicationStopFailures: true
+        Revision:
+          RevisionType: S3
+          S3Location:
+            Bucket: {Ref: CodedeployBucketName}
+            BundleType: {Ref: BundleType}
+            Key: {Ref: ApplicationName}
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      DeploymentGroupName: {'Fn::Sub': '${ApplicationName}-DeploymentGroup'}
+      DeploymentStyle: {DeploymentOption: WITH_TRAFFIC_CONTROL}
+      LoadBalancerInfo:
+        ElbInfoList:
+        - Name: {Ref: ClassicLoadBalancer}
+      ServiceRoleArn: {'Fn::GetAtt': CodeDeployServiceRole.Arn}
+    Type: AWS::CodeDeploy::DeploymentGroup
+  CodeDeployServiceRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action: ['sts:AssumeRole']
+          Effect: Allow
+          Principal:
+            Service: [codedeploy.amazonaws.com]
+        Version: 2012-10-17
+      ManagedPolicyArns: ['arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole']
+      RoleName: CodeDeployServiceRole
+    Type: AWS::IAM::Role
   InstanceRole:
     Properties:
       AssumeRolePolicyDocument:
